@@ -1,6 +1,6 @@
 #version 460
 
-struct Sphere {
+struct Shape {
     vec3 center;
     float radius;
     vec3 color;
@@ -38,23 +38,35 @@ uniform float sphereCount;
 
 // Functions prototypes -------------------------------------------------------
 
-Sphere unpackSphere(int index);
+Shape unpackShape(int index);
 
-float getSphereSDF(Sphere sphere, vec3 point);
+float getSphereSDF(Shape sphere, vec3 point);
 
-Sphere getClosestSphere(Ray ray);
+float getPlaneSDF(Shape plane, vec3 point);
+
+Shape getClosestShape(Ray ray);
 
 vec3 getPixelColor(Ray ray);
 
-vec3 getSelfShadow(Ray ray, Sphere sphere);
+vec3 getSelfShadow(Ray ray, Shape sphere);
 
-float getLightIntensity(Ray ray, Sphere sphere, vec3 lightPosition);
+vec3 getSphereSelfShadow(Ray ray, Shape sphere, vec3 lightPosition);
+
+vec3 getPlaneSelfShadow(Ray ray, Shape plane, vec3 lightPosition);
+
+float getSphereLightIntensity(Ray ray, Shape sphere, vec3 lightPosition);
+
+float getPlaneLightIntensity(Ray ray, Shape plane, vec3 lightPosition);
 
 Quaternion multiplyQuaternions(Quaternion a, Quaternion b);
 
 Quaternion conjugate(Quaternion q);
 
 Ray getRay(ivec2 pixel_coords, ivec2 screen_size);
+
+float getSDF(Shape shape, vec3 point);
+
+float copysign(float x, float y);
 
 // ----------------------------------------------------------------------------
 
@@ -77,44 +89,81 @@ void main() {
 
 // Functions definitions ------------------------------------------------------
 
-Sphere unpackSphere(int index) {
+Shape unpackShape(int index) {
 
-    Sphere sphere;
+    Shape shape;
     vec4 attributeChunk = imageLoad(spheres, ivec2(0,index));
-    sphere.center = attributeChunk.xyz;
-    sphere.radius = attributeChunk.w;
+    shape.center = attributeChunk.xyz;
+    shape.radius = attributeChunk.w;
     
     attributeChunk = imageLoad(spheres, ivec2(1,index));
-    sphere.color = attributeChunk.xyz;
-    sphere.type = attributeChunk.w;
+    shape.color = attributeChunk.xyz;
+    shape.type = attributeChunk.w;
 
     attributeChunk = imageLoad(spheres, ivec2(2,index));
-    sphere.reflectivity = attributeChunk.x;
+    shape.reflectivity = attributeChunk.x;
 
-    return sphere;
+    return shape;
 }
 
-float getSphereSDF(Sphere sphere, vec3 point) {
+float getSDF(Shape shape, vec3 point) {
+
+    float sdf;
+
+    if (shape.type == 0) // Sphere
+    {
+        sdf = getSphereSDF(shape, point);
+    }
+    else if (shape.type == 1) // Plane
+    {
+        sdf = getPlaneSDF(shape, point);
+    }
+
+    return sdf;
+}
+
+float getSphereSDF(Shape sphere, vec3 point) {
     return length(sphere.center - point) - sphere.radius;
 }
 
-Sphere getClosestSphere(Ray ray) {
+float getPlaneSDF(Shape plane, vec3 point) {
+    float minx[2] = {point.x, plane.center.x};
+    if (minx[0] > minx[1]) {
+        minx[0] = minx[1];
+        minx[1] = point.x;
+    }
+    float minz[2] = {point.z, plane.center.z};
+    if (minz[0] > minz[1]) {
+        minz[0] = minz[1];
+        minz[1] = point.z;
+    }
+
+    float distx = max(minx[1] - minx[0] - plane.radius, 0.0); // maybe replace plane.radius by plae.width and plane.height in the future
+    float distz = max(minz[1] - minz[0] - plane.radius, 0.0); // here too
+
+    float hitx = point.x - copysign(distx, point.x - plane.center.x);
+    float hitz = point.z - copysign(distz, point.z - plane.center.z);
+
+    return sqrt(pow(point.x - hitx, 2) + pow(point.z - hitz, 2) + pow(point.y - plane.center.y, 2));
+}
+
+Shape getClosestShape(Ray ray) {
 
     float closest = 999999;
     float dist;
-    Sphere closestSphere;
+    Shape closestShape;
     for (int i = 0; i < sphereCount; i++)
     {
-        Sphere sphere = unpackSphere(i);
-        dist = getSphereSDF(sphere, ray.origin);
+        Shape shape = unpackShape(i);
+        dist = getSDF(shape, ray.origin);
         if (dist < closest)
         {
             closest = dist;
-            closestSphere = sphere;
+            closestShape = shape;
         }
     }
 
-    return closestSphere;
+    return closestShape;
 }
 
 vec3 getPixelColor(Ray ray) {
@@ -126,13 +175,13 @@ vec3 getPixelColor(Ray ray) {
     float maxIterations = 40;
     float maxDistance = 100;
     float dist;
-    Sphere closestSphere;
+    Shape closestShape;
     bool hit = false;
 
     while (iteration < maxIterations && totalDistance < maxDistance)
     {
-        closestSphere = getClosestSphere(ray);
-        dist = getSphereSDF(closestSphere, ray.origin);
+        closestShape = getClosestShape(ray);
+        dist = getSDF(closestShape, ray.origin);
         if (dist < 0.01)
         {
             // pixelColor = closestSphere.color;         //  <= solid color
@@ -147,29 +196,73 @@ vec3 getPixelColor(Ray ray) {
 
     if (hit)
     {
-        pixelColor = getSelfShadow(ray, closestSphere);
+        pixelColor = getSelfShadow(ray, closestShape);
     }
 
     return pixelColor;
 }
 
-vec3 getSelfShadow(Ray ray, Sphere sphere) {
+vec3 getSelfShadow(Ray ray, Shape shape) {
 
     vec3 lightPosition = vec3(20, -30, 0);
+    vec3 pixelColor = vec3(0.0);
+
+    if (shape.type == 0) // Sphere
+    {
+        pixelColor = getSphereSelfShadow(ray, shape, lightPosition);
+    }
+    else if (shape.type == 1) // Plane
+    {
+        pixelColor = getPlaneSelfShadow(ray, shape, lightPosition);
+    }
+
+    return pixelColor;
+}
+
+vec3 getSphereSelfShadow(Ray ray, Shape sphere, vec3 lightPosition) {
+
     vec3 lightColor = vec3(1, 1, 1);
-    float lightIntensity = getLightIntensity(ray, sphere, lightPosition);
+    float lightIntensity = getSphereLightIntensity(ray, sphere, lightPosition);
     vec3 pixelColor = sphere.color * lightColor * lightIntensity;
 
     return pixelColor;
 }
 
-float getLightIntensity(Ray ray, Sphere sphere, vec3 lightPosition) {
+vec3 getPlaneSelfShadow(Ray ray, Shape plane, vec3 lightPosition) {
+
+    vec3 lightColor = vec3(1, 1, 1);
+    float lightIntensity = getPlaneLightIntensity(ray, plane, lightPosition);
+    vec3 pixelColor = plane.color * lightColor * lightIntensity;
+
+    return pixelColor;
+}
+
+float getSphereLightIntensity(Ray ray, Shape sphere, vec3 lightPosition) {
 
     // Calculate cross product of sphere normal at ray.origin and light direction
     float lightIntensity = 0;
     vec3 lightDirection = normalize(lightPosition - ray.origin);
     vec3 sphereNormal = normalize(ray.origin - sphere.center);
     float dotProduct = dot(sphereNormal, lightDirection);
+    if (dotProduct > 0)
+    {
+        lightIntensity = dotProduct;
+    }
+    else
+    {
+        lightIntensity = 0;
+    }
+
+    return lightIntensity;
+}
+
+float getPlaneLightIntensity(Ray ray, Shape plane, vec3 lightPosition) {
+
+    // Calculate cross product of plane normal at ray.origin and light direction
+    float lightIntensity = 0;
+    vec3 lightDirection = normalize(lightPosition - ray.origin);
+    vec3 planeNormal = normalize(vec3(0, 1, 0));
+    float dotProduct = dot(planeNormal, lightDirection);
     if (dotProduct > 0)
     {
         lightIntensity = dotProduct;
@@ -222,4 +315,8 @@ Ray getRay(ivec2 pixel_coords, ivec2 screen_size) {
     ray.direction = normalize(rotatedRayQuat.v);
 
     return ray;
+}
+
+float copysign(float a, float b) {
+    return abs(a) * sign(b);
 }
