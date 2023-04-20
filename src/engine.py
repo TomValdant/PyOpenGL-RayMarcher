@@ -16,11 +16,12 @@ class Engine:
         self.screenWidth = width
         self.screenHeight = height
 
+        shaderFolder = path.abspath(__file__).replace("engine.py", "shaders/")
         #general OpenGL configuration
-        self.shader = self.createShader("src/shaders/frameBufferVertex.glsl",
-                                        "src/shaders/frameBufferFragment.glsl")
+        self.shader = self.createShader(shaderFolder + "frameBufferVertex.glsl",
+                                        shaderFolder + "frameBufferFragment.glsl")
         
-        self.rayTracerShader = self.createComputeShader("src/shaders/rayMarcher.glsl")
+        self.rayTracerShader = self.createComputeShader(shaderFolder + "rayMarcher.glsl")
         
         glUseProgram(self.shader)
         

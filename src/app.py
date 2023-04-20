@@ -13,7 +13,7 @@ class App:
         pg.init()
         self.screenWidth = 1300
         self.screenHeight = 1300
-        self.res = 600
+        self.res = 1300
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 4)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_PROFILE_MASK,
@@ -87,8 +87,8 @@ class App:
             if keys[pg.K_DOWN]:
                 self.scene.camera.forwards[1] -= 0.05
             
-            self.scene.spheres[0].center[0] = 10*cos(time.time())
-            self.scene.spheres[0].center[2] = 10*sin(time.time())
+            # self.scene.spheres[0].center[0] = 10*cos(time.time())
+            # self.scene.spheres[0].center[2] = 10*sin(time.time())
 
             #render
             self.graphicsEngine.renderScene(self.scene)
