@@ -13,7 +13,7 @@ class App:
         pg.init()
         self.screenWidth = 1300
         self.screenHeight = 1300
-        self.res = 300
+        self.res = 600
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 4)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_PROFILE_MASK,
