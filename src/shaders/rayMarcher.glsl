@@ -1,5 +1,12 @@
 #version 460
 
+/* 
+
+TODO:
+
+
+*/
+
 struct Shape {
     vec3 center;
     float radius;
@@ -46,13 +53,15 @@ float getPlaneSDF(Shape plane, vec3 point);
 
 Shape getClosestShape(Ray ray);
 
+Shape getClosestShapeExceptSelf(Ray ray, Shape self);
+
 vec3 getPixelColor(Ray ray);
 
-vec3 getSelfShadow(Ray ray, Shape sphere);
+vec3 getSelfShadow(Ray ray, Shape sphere, vec3 initialColor);
 
-vec3 getSphereSelfShadow(Ray ray, Shape sphere, vec3 lightPosition);
+vec3 getSphereSelfShadow(Ray ray, Shape sphere, vec3 lightPosition, vec3 initialColor);
 
-vec3 getPlaneSelfShadow(Ray ray, Shape plane, vec3 lightPosition);
+vec3 getPlaneSelfShadow(Ray ray, Shape plane, vec3 lightPosition, vec3 initialColor);
 
 float getSphereLightIntensity(Ray ray, Shape sphere, vec3 lightPosition);
 
@@ -67,6 +76,16 @@ Ray getRay(ivec2 pixel_coords, ivec2 screen_size);
 float getSDF(Shape shape, vec3 point);
 
 float copysign(float x, float y);
+
+float getShadow(Ray ray, Shape shape, vec3 lightPosition);
+
+vec3 getReflection(Ray ray, Shape shape);
+
+Ray getReflectedRay(Ray ray, Shape shape);
+
+vec3 getSphereReflectedRay(Ray ray, Shape sphere);
+
+vec3 getPlaneReflectedRay(Ray ray);
 
 // ----------------------------------------------------------------------------
 
@@ -172,7 +191,7 @@ vec3 getPixelColor(Ray ray) {
 
     float totalDistance = 0 ;
     float iteration = 0;
-    float maxIterations = 40;
+    float maxIterations = 80;
     float maxDistance = 100;
     float dist;
     Shape closestShape;
@@ -184,7 +203,7 @@ vec3 getPixelColor(Ray ray) {
         dist = getSDF(closestShape, ray.origin);
         if (dist < 0.01)
         {
-            // pixelColor = closestSphere.color;         //  <= solid color
+            pixelColor = closestShape.color;         //  <= solid color
             // pixelColor.x = iteration / maxIterations; //  <= heat map
             hit = true;
             break;
@@ -196,43 +215,51 @@ vec3 getPixelColor(Ray ray) {
 
     if (hit)
     {
-        pixelColor = getSelfShadow(ray, closestShape);
+        
+        // calculate shadow
+        vec3 lightPosition = vec3(20, -30, 0);
+        pixelColor *= getShadow(ray, closestShape, lightPosition);
+        // calculate reflection
+        pixelColor = (1 - closestShape.reflectivity) * pixelColor + closestShape.reflectivity * getReflection(ray, closestShape);
+        // calculate self shadow
+        pixelColor = getSelfShadow(ray, closestShape, pixelColor);
+        
     }
 
     return pixelColor;
 }
 
-vec3 getSelfShadow(Ray ray, Shape shape) {
+vec3 getSelfShadow(Ray ray, Shape shape, vec3 initialColor) {
 
     vec3 lightPosition = vec3(20, -30, 0);
     vec3 pixelColor = vec3(0.0);
 
     if (shape.type == 0) // Sphere
     {
-        pixelColor = getSphereSelfShadow(ray, shape, lightPosition);
+        pixelColor = getSphereSelfShadow(ray, shape, lightPosition, initialColor);
     }
     else if (shape.type == 1) // Plane
     {
-        pixelColor = getPlaneSelfShadow(ray, shape, lightPosition);
+        pixelColor = getPlaneSelfShadow(ray, shape, lightPosition, initialColor);
     }
 
     return pixelColor;
 }
 
-vec3 getSphereSelfShadow(Ray ray, Shape sphere, vec3 lightPosition) {
+vec3 getSphereSelfShadow(Ray ray, Shape sphere, vec3 lightPosition, vec3 initialColor) {
 
     vec3 lightColor = vec3(1, 1, 1);
     float lightIntensity = getSphereLightIntensity(ray, sphere, lightPosition);
-    vec3 pixelColor = sphere.color * lightColor * lightIntensity;
+    vec3 pixelColor = initialColor * lightColor * lightIntensity;
 
     return pixelColor;
 }
 
-vec3 getPlaneSelfShadow(Ray ray, Shape plane, vec3 lightPosition) {
+vec3 getPlaneSelfShadow(Ray ray, Shape plane, vec3 lightPosition, vec3 initialColor) {
 
     vec3 lightColor = vec3(1, 1, 1);
     float lightIntensity = getPlaneLightIntensity(ray, plane, lightPosition);
-    vec3 pixelColor = plane.color * lightColor * lightIntensity;
+    vec3 pixelColor = initialColor * lightColor * lightIntensity;
 
     return pixelColor;
 }
@@ -261,7 +288,7 @@ float getPlaneLightIntensity(Ray ray, Shape plane, vec3 lightPosition) {
     // Calculate cross product of plane normal at ray.origin and light direction
     float lightIntensity = 0;
     vec3 lightDirection = normalize(lightPosition - ray.origin);
-    vec3 planeNormal = normalize(vec3(0, 1, 0));
+    vec3 planeNormal = normalize(vec3(0, -1, 0));
     float dotProduct = dot(planeNormal, lightDirection);
     if (dotProduct > 0)
     {
@@ -272,7 +299,7 @@ float getPlaneLightIntensity(Ray ray, Shape plane, vec3 lightPosition) {
         lightIntensity = 0;
     }
 
-    return lightIntensity;
+    return lightIntensity * lightIntensity;
 }
 
 Quaternion multiplyQuaternions(Quaternion a, Quaternion b) {
@@ -320,3 +347,139 @@ Ray getRay(ivec2 pixel_coords, ivec2 screen_size) {
 float copysign(float a, float b) {
     return abs(a) * sign(b);
 }
+
+float getShadow(Ray ray, Shape shape, vec3 lightPosition){
+
+    bool shadow = false;
+    float totalDistance = 0;
+    int iteration = 0;
+    int maxIterations = 40;
+    float maxDistance = 50.0;
+    float dist;
+    float smallestDistance = 1.0;
+    Shape closestShape;
+    ray.direction = normalize(lightPosition - ray.origin);
+    ray.origin += ray.direction * 1;
+
+    while (iteration < maxIterations && totalDistance < maxDistance && (length(ray.origin - lightPosition) > 0.01))
+    {
+        closestShape = getClosestShapeExceptSelf(ray, shape);
+
+        dist = getSDF(closestShape, ray.origin);
+        if (dist < smallestDistance)
+        {
+            smallestDistance = dist;
+        }
+        dist = min(dist, length(ray.origin - lightPosition));
+        if (dist < 0.01)
+        {
+            shadow = true;
+            smallestDistance = 0;
+            break;
+        }
+        totalDistance += dist;
+        ray.origin += ray.direction * dist;
+        iteration++;
+    }
+
+    return min(smallestDistance, 1.0);
+}
+
+Shape getClosestShapeExceptSelf(Ray ray, Shape self) {
+
+    float closest = 999999;
+    float dist;
+    Shape closestShape;
+    for (int i = 0; i < sphereCount; i++)
+    {
+        Shape shape = unpackShape(i);
+        if (shape.center == self.center && shape.radius == self.radius && shape.color == self.color && shape.type == self.type)
+        {
+            continue;
+        }
+        dist = getSDF(shape, ray.origin);
+        if (dist < closest)
+        {
+            closest = dist;
+            closestShape = shape;
+        }
+    }
+
+    return closestShape;
+}
+
+vec3 getReflection(Ray ray, Shape shape) {
+
+    vec3 reflectionColor = vec3(0.0);
+    Ray reflection = getReflectedRay(ray, shape);
+
+    vec3 lightPosition = vec3(20, -30, 0);
+
+    // Ray march 
+    float totalDistance = 0;
+    int iteration = 0;
+    int maxIterations = 40;
+    float maxDistance = 50.0;
+    float dist;
+    float smallestDistance = 1.0;
+    Shape closestShape;
+    reflection.origin += reflection.direction * 1;
+
+    while (iteration < maxIterations && totalDistance < maxDistance)
+    {
+        closestShape = getClosestShapeExceptSelf(reflection, shape);
+
+        dist = getSDF(closestShape, reflection.origin);
+        if (dist < smallestDistance)
+        {
+            smallestDistance = dist;
+        }
+        if (dist < 0.01)
+        {
+            reflectionColor = closestShape.color;
+            // calculate self shadow
+            reflectionColor = getSelfShadow(reflection, closestShape, reflectionColor);
+
+            break;
+        }
+        totalDistance += dist;
+        reflection.origin += reflection.direction * dist;
+        iteration++;
+    }
+
+    return reflectionColor;
+}
+
+Ray getReflectedRay(Ray ray, Shape shape) {
+
+    Ray reflectionDirection;
+    reflectionDirection.origin = ray.origin;
+    if (shape.type == 0) // Sphere
+    {
+        reflectionDirection.direction = getSphereReflectedRay(ray, shape);
+    }
+    else if (shape.type == 1) // Plane
+    {
+        reflectionDirection.direction = getPlaneReflectedRay(ray);
+    }
+
+    return reflectionDirection;
+}
+
+vec3 getSphereReflectedRay(Ray ray, Shape sphere) {
+
+    vec3 reflectedRayDir;
+    vec3 sphereNormal = normalize(ray.origin - sphere.center);
+    reflectedRayDir = ray.direction - 2 * sphereNormal * dot(ray.direction, sphereNormal);
+
+    return normalize(reflectedRayDir);
+}
+
+vec3 getPlaneReflectedRay(Ray ray) {
+
+    vec3 reflectedRayDir = ray.direction;
+    reflectedRayDir.y = -reflectedRayDir.y;
+
+    return reflectedRayDir;
+}
+

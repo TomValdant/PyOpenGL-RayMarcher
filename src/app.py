@@ -11,9 +11,9 @@ class App:
     def __init__(self):
 
         pg.init()
-        self.screenWidth = 1000
-        self.screenHeight = 1000
-        self.res = 1000
+        self.screenWidth = 1300
+        self.screenHeight = 1300
+        self.res = 300
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 4)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_PROFILE_MASK,
@@ -57,7 +57,7 @@ class App:
             self.scene.camera.forwards[1] -= (mouse[1] - self.screenHeight/2) / 1000
             pg.mouse.set_pos((self.screenWidth/2, self.screenHeight/2))
 
-            moveStep = 0.1
+            moveStep = 0.3
 
             keys = pg.key.get_pressed()
             if keys[pg.K_ESCAPE]:
