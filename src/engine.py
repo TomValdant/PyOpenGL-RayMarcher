@@ -174,7 +174,7 @@ class Engine:
         glActiveTexture(GL_TEXTURE0)
         glBindImageTexture(0, self.colorBuffer, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F)
         
-        glDispatchCompute(self.screenWidth, self.screenHeight, 1)
+        glDispatchCompute(int(self.screenWidth / 8), int(self.screenHeight / 4), 1)
   
         # make sure writing to image has finished before read
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)

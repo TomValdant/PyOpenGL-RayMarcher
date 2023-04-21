@@ -34,7 +34,7 @@ struct Quaternion {
 
 
 // input/output
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 8, local_size_y = 4) in;
 layout(rgba32f, binding = 0) uniform image2D img_output;
 
 //Scene data
