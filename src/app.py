@@ -2,18 +2,20 @@ from config import *
 import engine
 import scene
 import time
+import menus
 
 class App:
     """
         Calls high level control functions (handle input, draw scene etc)
     """
 
-    def __init__(self):
+    def __init__(self, scene, res):
 
         pg.init()
-        self.screenWidth = 1300
-        self.screenHeight = 1300
-        self.res = 1300
+        self.screenWidth = 1000
+        self.screenHeight = 1000
+        self.res = res
+        self.pauseMenu = menus.pauseMenu(self)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 4)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
         pg.display.gl_set_attribute(pg.GL_CONTEXT_PROFILE_MASK,
@@ -24,7 +26,7 @@ class App:
         pg.event.set_grab(True)
 
         self.graphicsEngine = engine.Engine(self.res, self.res)
-        self.scene = scene.Scene()
+        self.scene = scene
 
         self.lastTime = pg.time.get_ticks()
         self.currentTime = 0
@@ -37,12 +39,21 @@ class App:
     
     def mainLoop(self):
 
-        running = True
-        while (running):
+        self.running = True
+        while (self.running):
             #events
             for event in pg.event.get():
                 if (event.type == pg.QUIT):
                     running = False
+                if (event.type == pg.KEYDOWN):
+                    if (event.key == pg.K_ESCAPE):
+                        self.pauseMenu.show()
+                        if not self.running:
+                            break
+                        self.__init__(self.scene, self.res)
+
+            if not self.running:
+                break
 
             playerDirZ = [0,0]
             playerDirZ[0] = cos(self.scene.camera.forwards[0])
@@ -58,10 +69,10 @@ class App:
             pg.mouse.set_pos((self.screenWidth/2, self.screenHeight/2))
 
             moveStep = 0.3
-
+            
             keys = pg.key.get_pressed()
-            if keys[pg.K_ESCAPE]:
-                running = False
+            #if keys[pg.K_ESCAPE]:
+                #self.pauseMenu.show()
             if keys[pg.K_z]:
                 self.scene.camera.position[2] += playerDirZ[0]*moveStep
                 self.scene.camera.position[0] += playerDirZ[1]*moveStep
@@ -87,8 +98,9 @@ class App:
             if keys[pg.K_DOWN]:
                 self.scene.camera.forwards[1] -= 0.05
             
-            # self.scene.spheres[0].center[0] = 10*cos(time.time())
-            # self.scene.spheres[0].center[2] = 10*sin(time.time())
+            self.scene.spheres[-2].center[0] = 75*cos(time.time())
+            self.scene.spheres[-2].center[1] = 20*(cos(time.time()*3) -1)
+            self.scene.spheres[-2].center[2] = 75*sin(time.time())
 
             #render
             self.graphicsEngine.renderScene(self.scene)

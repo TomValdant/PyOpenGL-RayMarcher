@@ -192,7 +192,7 @@ vec3 getPixelColor(Ray ray) {
     float totalDistance = 0 ;
     float iteration = 0;
     float maxIterations = 80;
-    float maxDistance = 100;
+    float maxDistance = 200;
     float dist;
     Shape closestShape;
     bool hit = false;
@@ -290,13 +290,13 @@ float getPlaneLightIntensity(Ray ray, Shape plane, vec3 lightPosition) {
     vec3 lightDirection = normalize(lightPosition - ray.origin);
     vec3 planeNormal = normalize(vec3(0, -1, 0));
     float dotProduct = dot(planeNormal, lightDirection);
-    if (dotProduct > 0)
+    if (dotProduct > 0.2)
     {
         lightIntensity = dotProduct;
     }
     else
     {
-        lightIntensity = 0;
+        lightIntensity = 0.2;
     }
 
     return lightIntensity * lightIntensity;
@@ -354,12 +354,12 @@ float getShadow(Ray ray, Shape shape, vec3 lightPosition){
     float totalDistance = 0;
     int iteration = 0;
     int maxIterations = 40;
-    float maxDistance = 50.0;
+    float maxDistance = 100.0;
     float dist;
     float smallestDistance = 1.0;
     Shape closestShape;
     ray.direction = normalize(lightPosition - ray.origin);
-    ray.origin += ray.direction * 1;
+    ray.origin += ray.direction * 2;
 
     while (iteration < maxIterations && totalDistance < maxDistance && (length(ray.origin - lightPosition) > 0.01))
     {
@@ -382,7 +382,7 @@ float getShadow(Ray ray, Shape shape, vec3 lightPosition){
         iteration++;
     }
 
-    return min(smallestDistance, 1.0);
+    return max(min(smallestDistance, 1.0),0.2);
 }
 
 Shape getClosestShapeExceptSelf(Ray ray, Shape self) {
