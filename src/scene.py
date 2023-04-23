@@ -28,5 +28,5 @@ class Scene:
 
 
         self.camera = camera.Camera(
-            position = [0, 0, 0]
+            position = [0, -10, 0]
         )
