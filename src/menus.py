@@ -1,36 +1,92 @@
 import pygame
 from config import *
 
+# This entire file needs to be rewritten using inheritance and rendering all the assests of each menu
+# in a for loop. This will make it easier to add more menus and make the code more readable.
+
 class resMenu():
 
     def __init__(self, app) -> None:
         self.app = app
-        self.font = pygame.font.SysFont("Arial", 20)
+        self.font = pygame.font.SysFont("Arial", 54)
         self.inMenu = False
 
         self.doneTxt = self.font.render("Done", True, (255, 255, 255))
         self.doneRect = self.doneTxt.get_rect()
-        self.doneRect.center = (self.app.res/2, self.app.res/2)
+        self.doneRect.center = (self.app.screenWidth/2, self.app.screenWidth/2 + 100)
 
         # slider not finished
-        self.slider = pygame.Rect(self.app.res/2 - 100, self.app.res/2 - 10, 200, 20)
+        #self.slider = pygame.Rect(self.app.res/2 - 100, self.app.res/2 - 10, 200, 20)
+        
+        # temporary buttons to chose resolution between 250, 600, 1000
+        self.res1Txt = self.font.render("250", True, (255, 255, 255))
+        self.res1Rect = self.res1Txt.get_rect()
+        self.res1Rect.center = (self.app.screenWidth/2 - 150, self.app.screenWidth/2)
+
+        self.res2Txt = self.font.render("600", True, (255, 255, 255))
+        self.res2Rect = self.res2Txt.get_rect()
+        self.res2Rect.center = (self.app.screenWidth/2, self.app.screenWidth/2)
+
+        self.res3Txt = self.font.render("1000", True, (255, 255, 255))
+        self.res3Rect = self.res3Txt.get_rect()
+        self.res3Rect.center = (self.app.screenWidth/2 + 150, self.app.screenWidth/2)
+
+        # rectangle that contains all the res buttons
+        self.resRect = pygame.Rect(self.app.screenWidth/2 - 250, self.app.screenWidth/2 - 50, 500, 100)
+
+        # Resolution text on top of the rectangle
+        self.resTxt = self.font.render("Resolution", True, (255, 255, 255))
+        self.resTxtRect = self.resTxt.get_rect()
+        self.resTxtRect.center = (self.app.screenWidth/2, self.app.screenWidth/2 - 100)
+
 
     def render(self):
             
             #self.app.screen.fill((21, 12, 80))
             self.screen.fill((21, 12, 80))
+            mouse = pygame.mouse.get_pos()
     
             # render a slider (not finished)
-            pygame.draw.rect(self.screen, (255, 255, 255), self.slider)
+            # pygame.draw.rect(self.screen, (255, 255, 255), self.slider)
+
+            # render the res buttons (temporary)
+            # bad design, will be changed later
+            if self.res1Rect.collidepoint(mouse):
+                self.res1Txt = self.font.render("250", True, (255, 0, 0))
+            else:
+                self.res1Txt = self.font.render("250", True, (255, 255, 255))
+
+            self.screen.blit(self.res1Txt, self.res1Rect)
+
+            if self.res2Rect.collidepoint(mouse):
+                self.res2Txt = self.font.render("600", True, (255, 0, 0))
+            else:
+                self.res2Txt = self.font.render("600", True, (255, 255, 255))
+
+            self.screen.blit(self.res2Txt, self.res2Rect)
+
+            if self.res3Rect.collidepoint(mouse):
+                self.res3Txt = self.font.render("1000", True, (255, 0, 0))
+            else:
+                self.res3Txt = self.font.render("1000", True, (255, 255, 255))
+
+            self.screen.blit(self.res3Txt, self.res3Rect)
+
     
             # render a Done button
-            mouse = pygame.mouse.get_pos()
+            
             if self.doneRect.collidepoint(mouse):
                 self.doneTxt = self.font.render("Done", True, (255, 0, 0))
             else:
                 self.doneTxt = self.font.render("Done", True, (255, 255, 255))
     
             self.screen.blit(self.doneTxt, self.doneRect)
+
+            # render rectangle that contains all the res buttons
+            pygame.draw.rect(self.screen, (255, 255, 255), self.resRect, 2)
+
+            # render Resolution text on top of the rectangle
+            self.screen.blit(self.resTxt, self.resTxtRect)
 
             pygame.display.flip()
 
@@ -45,8 +101,18 @@ class resMenu():
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         self.inMenu = False
+                # bad design, will be changed later
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if self.doneRect.collidepoint(event.pos):
+                        self.inMenu = False
+                    if self.res1Rect.collidepoint(event.pos):
+                        self.app.res = 250
+                        self.inMenu = False
+                    if self.res2Rect.collidepoint(event.pos):
+                        self.app.res = 600
+                        self.inMenu = False
+                    if self.res3Rect.collidepoint(event.pos):
+                        self.app.res = 1000
                         self.inMenu = False
 
     def show(self, screen):
